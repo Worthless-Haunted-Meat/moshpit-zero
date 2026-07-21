@@ -2,6 +2,10 @@
 
 **Front-row energy, zero barriers.** Live VR front-row view for handicapped concert-goers on the metal cruise.
 
+A program of [Worthless Haunted Meat](https://worthlesshauntedmeat.org), a 501(c)(3) nonprofit.
+
+> Full MVP specification: [SPEC.md](SPEC.md)
+
 ## The Pitch
 
 Wheelchair users and mobility-limited fans never get the rail. MoshPit Zero puts a 180° camera at the stage and streams a front-row POV to VR headsets anywhere in the venue — everyone gets a spot on the rail.

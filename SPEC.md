@@ -1,6 +1,6 @@
 # MoshPit Zero — MVP Specification
 
-Version 0.2 — pilot scope: one venue, one camera, three headsets, turnkey appliance.
+Version 0.3 — pilot scope: one venue, two cameras (rail + drum riser), three headsets, turnkey appliance.
 
 ## 1. Goal
 
@@ -28,19 +28,23 @@ Deliver a **live** front-row (rail) point-of-view of a concert to VR headsets wo
 ## 4. System Overview
 
 ```
-[180° camera @ stage rail]
-        │ USB-C (UVC webcam mode) or HDMI → USB capture  ← wired, no camera Wi-Fi/RTMP
-        ▼
+[180° cam @ stage rail]      [180° cam @ drum riser, facing out]
+        │ wired UVC/HDMI              │ wired UVC/HDMI   ← no camera Wi-Fi/RTMP
+        └──────────┬──────────────────┘
+                   ▼
 [Appliance: fanless N100 mini-PC, headless]
-  ffmpeg (QuickSync HW encode) → MediaMTX (WebRTC)
+  2× ffmpeg (QuickSync HW encode) → MediaMTX (two WebRTC paths: /rail, /drums)
   auto-boots into the pipeline via systemd, ~60 s to live
         │ Ethernet
         ▼
 [Dedicated travel router — isolated Wi-Fi, no internet]
         │
         ▼
-[3× Quest 3S in kiosk mode — player auto-launches into the stream on wake]
+[3× Quest 3S in kiosk mode — player auto-launches into /rail on wake;
+ single in-player toggle switches Rail ↔ Drum Cam]
 ```
+
+Angle selection is per-viewer, in the player, with one button. There is no operator-side switching desk — that would break turnkey.
 
 Why not simpler options:
 
@@ -52,21 +56,22 @@ Why not simpler options:
 
 | Item | Spec | Qty | Est. |
 |---|---|---|---|
-| Camera | 180° 3D/VR capable, min 4K@30 per eye equivalent, USB webcam mode or clean HDMI out (Canon PowerShot V10-class VR cam or Insta360 X4 in 180° mode) | 1 | $400–800 |
+| Rail camera | 180° 3D/VR capable, min 4K@30 per eye equivalent, USB webcam mode or clean HDMI out (Canon PowerShot V10-class VR cam or Insta360 X4 in 180° mode) | 1 | $400–800 |
+| Drum camera | Same spec; mounted on/behind the drum riser facing out over the kit. Needs a vibration-tolerant clamp — a drum riser shakes hard | 1 | $400–800 |
 | Headsets | Meta Quest 3S, 128 GB | 3 | ~$900 |
 | Router | Dual-band travel router, WPA3, ≥ Wi-Fi 5; venue-isolated SSID | 1 | ~$100 |
-| Appliance | Fanless Intel N100 mini-PC, 8–16 GB RAM, QuickSync HW encode; runs headless Linux | 1 | ~$150–200 |
-| Capture | HDMI→USB 3.0 capture dongle (only if camera lacks a 4K UVC webcam mode) | 1 | ~$30 |
-| Mount | Clamp or stand for rail/stage-side placement + safety tether | 1 | ~$50 |
+| Appliance | Fanless Intel N100 mini-PC, 16 GB RAM, QuickSync HW encode (must sustain 2× 4K@30 encodes); runs headless Linux | 1 | ~$180–220 |
+| Capture | HDMI→USB 3.0 capture dongles (only for cameras lacking a 4K UVC webcam mode) | 2 | ~$60 |
+| Mounts | Rail clamp + vibration-tolerant drum-riser clamp, safety tethers | 2 | ~$100 |
 | Power | Camera continuous power (USB-PD battery or venue outlet), headset chargers | — | ~$50 |
 | Hygiene | Wipeable silicone facial interfaces + sanitizing wipes | 3 sets | ~$60 |
 
 ## 6. Software Pipeline
 
-- **Capture:** camera in UVC webcam / HDMI-out mode at highest stable resolution ≥ 4K equirectangular 180°, wired into the appliance.
-- **Encode:** ffmpeg with Intel QuickSync (h264_qsv), 4K@30, 20–30 Mbps CBR, zero-latency tune.
-- **Distribute:** MediaMTX on the appliance, WebRTC only for live viewing.
-- **View:** Quest 3S in kiosk mode — headset wakes directly into the 180° player (WebXR page in Quest browser kiosk, or DeoVR auto-launch) pointed at a fixed stream URL. Zero taps: don headset → see show.
+- **Capture:** both cameras in UVC webcam / HDMI-out mode at highest stable resolution ≥ 4K equirectangular 180°, wired into the appliance.
+- **Encode:** 2× ffmpeg with Intel QuickSync (h264_qsv), 4K@30, 20–30 Mbps CBR each, zero-latency tune. Bench-verify the N100 sustains both encodes; if thermal/throughput limited, drum cam drops to 2880p before anything else gives.
+- **Distribute:** MediaMTX on the appliance, WebRTC only for live viewing; one path per camera (`/rail`, `/drums`).
+- **View:** Quest 3S in kiosk mode — headset wakes directly into the 180° player (WebXR page in Quest browser kiosk, or DeoVR auto-launch) on `/rail`. Zero taps to watch; one in-player button toggles Rail ↔ Drum Cam per viewer.
 - **Appliance lifecycle:** systemd units for capture/encode/serve with auto-restart; whole pipeline live within ~60 s of power-on with no interaction. Status LED or router-admin check is the only "monitoring UI" at show time.
 - **Operator monitoring:** MediaMTX metrics endpoint viewable from the operator's phone on the same Wi-Fi (read-only status page — not part of the viewer path).
 
@@ -104,7 +109,8 @@ Viewers hear the venue live; video lag past ~3 s against the artist breaks the e
 2. Video-to-venue-audio lag ≤ 3 s (target < 1 s) as perceived from the accessible seating area — measured, not eyeballed: clap test on camera vs. headset view.
 3. A first-time VR user sees the live show by simply putting the headset on — zero taps after orientation.
 4. Appliance reaches "live and serving" within 2 minutes of power-on with no operator interaction.
-5. Total spend ≤ $2,200.
+5. Angle toggle switches streams in < 3 s without leaving the player.
+6. Total spend ≤ $3,000.
 6. At least one viewer says, unprompted, that they'd use it again.
 
 ## 11. Risks
@@ -121,6 +127,6 @@ Viewers hear the venue live; video lag past ~3 s against the artist breaks the e
 
 - **More headsets** → 3 users actually competing for them
 - **Spatial audio** → viewers report venue audio is insufficient
-- **Multi-camera / switching** → viewers ask for different angles
+- **Side-stage cameras (stage left + stage right, 4 streams total)** → viewers actually use the Rail↔Drums toggle and ask for more angles; also requires bench proof the appliance (or an upgraded one) sustains 4× 4K encodes
 - **Custom headset app** → kiosk-mode player proves too fragile across Quest OS updates
 - **Official cruise-organizer program** → one cruise of footage + viewer reactions in hand
